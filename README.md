@@ -1,0 +1,1 @@
+# BIP0352-index-server-specification
