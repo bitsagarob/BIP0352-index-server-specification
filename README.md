@@ -6,7 +6,19 @@ This specification defines a unified standard for Silent Payments indexing servi
 
 ## Motivation
 
-The goal of this spec is to provide a unified standard for Silent Payments wallet and service developers to use when implementing receive support. Although it might appear that index servers are only necessary for [light client support](https://github.com/setavenger/BIP0352-light-client-specification) (wallets that go offline for periods of time) removing the scanning operation from wallets improves the user experience, speeds up and simplifies wallet receiving implementations. Minimizing the time it takes for users to confirm on chain balance when opening a wallet will match existing expectations for user experience. Another benefit to having a common spec for tweak services is developers can iterate on wallet or server improvements once and not require massive coordination on upgrade compatibility.
+The goal of this specification is to provide a unified standard for Silent Payments wallet and service developers to implement receive support. The Electrum protocol provides a great model for how wallet-server communication works today, demonstrating efficient client-server interactions for lightweight Bitcoin wallets. This specification is not meant to replace the Electrum protocol but to extend it to support Silent Payments, leveraging its proven architecture to enhance privacy and efficiency.
+
+Although it might appear that index servers are only necessary for [light client support](https://github.com/setavenger/BIP0352-light-client-specification), reducing scanning operations for wallets improves the user experience, speeds up, and simplifies wallet receiving implementations. Minimizing the time it takes for users to confirm on-chain balance when opening a wallet aligns with existing expectations for user experience. Another benefit of having a common specification for tweak services is that developers can iterate on wallet or server improvements once, without requiring extensive coordination for upgrade compatibility.
+
+## Current Landscape
+
+[blindbit](https://github.com/setavenger/blindbit-oracle), [cake wallet](https://github.com/cake-tech/blockstream-electrs) and [silentiumd](https://github.com/louisinger/silentiumd) have completed indexing server solutions that are being leveraged by wallet developers today. The current approaches successfully dervive tweaks and perform additional scan operations but there is no clear definition of what role each service provides to the wallet. A wallet team could not swap services without signficant changes to wallet design. Once this specification is solidified each of the current implementations will have a framework to align data formats and validate data integrity.
+
+- blindbit-oracle
+  - dana-wallet
+  - BDK + kyoto
+- cake-esplora
+  - cake wallet
 
 ## Hosted Service Scanner Models
 
@@ -153,7 +165,7 @@ API endpoints are grouped by Service Roles, thought has been given to include wh
 
 |                                   |                | Service Roles            | | | | | | | |
 | --------------------------------- | :------------: | :----------------------: | :-----------------: | -------------------------------------------------------------------------------------------------------- | :-----------------: | :---------------: | :------------: | :--------------------: | :--------------: |
-| **Endpoint**                      | **SP Scanner** | **Block Filter Manager** | **Block Processor** | ***Description***                                                                                        | **blindbit-oracle** | **blindbit-scan** | **silentiumd** | **silent-pay-indexer** | **cake electrs** |
+| **Endpoint**                      | **SP Scanner** | **Block Filter Manager** | **Block Processor** | ***Description***                                                                                        | **blindbit-oracle** | **blindbit-scan** | **silentiumd** | **silent-pay-indexer** | **cake esplora** |
 | /info                             |                |      Required       |      Required         | returns basic information about the indexing server instance                                                |          Y          |        Similar    |     Similar    |              Y         |                  |
 | /block-hash/:blockheight          |                |      Required       |      Required         | returns the block-hash for a certain block-height - used by wallet to detect reorg                          |          Y          |                   |                |              Y         |                  |
 | /tweak/:blockheight?dustLimit&filterSpent|         |                     |      Required         | returns tweak data; optional parameters filterSpent + dustLimit.                                            |          Y          |          Uses     |     Similar    |                        |     Similar      |
