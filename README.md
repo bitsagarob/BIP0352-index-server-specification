@@ -121,6 +121,24 @@ Stack implementations combine one or more service roles to create unique offerin
    2. Mempool Monitoring
    3. Receive Notifications
 
+### Remote Scanner (Ephemeral)
+
+- combines ***SP Scanner + Block Filter Manager + Block Processor***
+
+1. Configured to respond to any wallet
+   1. Must index entire chain from Taproot activation
+   2. Wallet request UTXOs from service
+2. Service is trusted
+   1. To preserve forward privacy a user should rotate wallet when leaving service
+3. Novice or Technical User
+   1. Share scan key pair + spend public key with **server during a session**
+   2. Relies on well organized UI/UX to educate user on *"scanning concepts"*
+4. Additional Services
+   1. Wallet Recovery
+      1. Wallet should maintain SP transaction archive
+   2. Mempool Monitoring
+      1. May be rate limited to a few checks per minute or max per day
+
 ### Serve Tweaks for any number of users (Anonymous)
 
 - combines ***Block Filter Manager + Block Processor***
@@ -143,21 +161,21 @@ Stack implementations combine one or more service roles to create unique offerin
 
 |                                             |                                                                    | Silent Payment Stack                                                                         |                                                                                                          |
 | ------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| **Feature**                                 | **My Scanner (Personalized)**                                      | **Trusted Scanner (Personalized)**                                                           | **Tweak Server (Anonymous)**                                                                             |
-| *Privacy*                                   | Full <br>(register spend public key & scan private key) <br>Self Hosted  | Privacy from all but Indexer Service <br>(register spend public key & scan private key) <br>Hosted | Mask interest in ScriptPubKeys and Transaction <br>(Care should be taken when filtering for blocks) <br>Hosted |
+| **Feature**                                 | **My Scanner (Personalized)**                                      | **Remote Scanner (Ephemeral)**                                                           | **Tweak Server (Anonymous)**                                                                             |
+| *Privacy*                                   | Full <br>(register spend public key & scan private key) <br>Self Hosted  | Privacy from all but Indexer Service <br>(share spend public key & scan private key) for a session<br>Hosted | Mask interest in ScriptPubKeys and Transaction <br>(Care should be taken when filtering for blocks) <br>Hosted |
 | *Skill (User)*                              | Experienced / Technical                                            | Novice                                                                                       | Novice / Moderate                                                                                        |
-| *Security (Trust)*                          | Trusted (Self hosted)                                              | Trusted (Paid)                                                                               | Untrusted (Free) <br>Should download full block on filtered match (no simplified utxo)                      |
-| *Wallet Requirements*                       | Send / Spend SP <br>[Fetch Payments](#my-scanner-integration) <br>Manage UTXOs | Send / Spend SP <br>[Fetch Payments](#my-scanner-integration) <br>Manage UTXOs          | Send / Spend SP <br>[Scan For ScriptPubKeys](#tweak-server-integration) <br>Manage UTXOs                |
+| *Security (Trust)*                          | Trusted (Self hosted)                                              | Trusted (Paid/Free)                                                                          | Untrusted (Free) <br>Should download full block on filtered match (no simplified utxo)                      |
+| *Wallet Requirements*                       | Send / Spend SP <br>[Fetch Payments](#my-scanner-integration) <br>Manage UTXOs | Send / Spend SP <br>[Fetch Payments](#remote-scanner-integration) <br>Manage UTXOs          | Send / Spend SP <br>[Scan For ScriptPubKeys](#tweak-server-integration) <br>Manage UTXOs                |
 | *Wallet Backup / Recovery*                  | Label backup is necessary, recovering transactions should be quick | Label backup is necessary, loss of history if cut through is enabled                         | Most important <br>Label backup + utxo backup would be best <br>(restore could be rate limited)                |
 | *Dust*                                      | wallet preference                                                  | wallet preference                                                                            | wallet preference                                                                                        |
 | *Spent Tx Filtering* (Cut Through)          | Optional                                                           | Optional                                                                                     | Possible / Necessary                                                                                     |
 | *Payment Notifications*                     | Optional                                                           | Optional                                                                                     | Not Feasible                                                                                             |
 | *Mempool Monitoring*                        | Optional                                                           | Optional                                                                                     | Not Feasible                                                                                             |
-| *Performance / UX (Offline catch up delay)* | Wallet can have same UX as traditional payment                     | Wallet can have same UX as traditional payment                                               | Wallet will need to sync (catch up) to find all UTXOs                                                    |
+| *Performance / UX (Offline catch up delay)* | Wallet can have same UX as traditional payment                     | Wallet will need to sync (catch up) to find all UTXOs - /scan or /scan-bulk                  | Wallet will need to sync (catch up) to find all UTXOs                                                    |
 | *Server Storage Requirements*               | Large                                                              | Large                                                                                        | Large                                                                                                    |
 | *Client Bandwidth  (wallet <-> service)*    | High                                                               | Low                                                                                          | Moderate                                                                                                 |
-| *Client Transaction Rate*                   | unlimited                                                          | unlimited                                                                                    | < 1 day                                                                                                  |
-| *Labels*                                    | Supported - register labels with service                           | Label backup as a Service                                                                    | Should labels be offered in wallet at all?                                                               |
+| *Client Transaction Rate*                   | unlimited                                                          | < ~20 day                                                                                     | < 1 day                                                                                                  |
+| *Labels*                                    | Supported - register labels with service                           | Managed by wallet                                                                            | Should labels be offered in wallet at all?                                                               |
 
 ## Server API endpoints
 
@@ -181,6 +199,12 @@ API endpoints are grouped by Service Roles, thought has been given to include wh
 | /register                         |        Y       |                     |                       | handles registering new wallets; returns unique wallet identifier                                           |                     |        Y          |                |                        |                  |
 | /wallet/utxos?restore             |        Y       |                     |                       | serves UTXOs since last check; restore all known UTXOs                                                      |                     |        Y          |                |                        |                  |
 | /labels                           |        Y       |                     |                       | add or return list of labels                                                                                |                     |        Y          |                |                        |                  |
+| | | | | | | | | | |
+| /scan/:keys/:block_range          | | | | scan a range of blocks given scan_sk + sp address; returns UTXOs or busy | | | | |
+| /scan-bulk/:keys/:block_range     | | | | start async scan for UTXOs; returns a scan token and expected duration | | | | |
+| /scan-results/:token              | | | | provide scan token to collect UTXOs or updated duration | | | | |
+| /scan-mempool/:keys               | | | | subscribe to unconfirmed scanning given scan_sk + sp address | | | | |
+
 
 ### API Request/Response Schemas
 
@@ -250,6 +274,145 @@ API endpoints are grouped by Service Roles, thought has been given to include wh
   "hash": "00000000000000000002a7c4c1e48d76c5a37902165a270156b7a8d72728a054",
   "data": "hex_encoded_filter_bytes",
   "checksum or data length": 12345,
+}
+```
+
+#### Ephemeral Scanner Service Endpoints
+
+##### POST /scan/:keys/:block_range
+
+Request:
+```json
+{
+  "scan_pk": "02abc123...",  
+  "scan_sk": "02abc123...",
+  "spend_pk": "03def456...",
+  "start_height": 800000,
+  "end_height": 800002,
+}
+```
+Response (complete):
+```json
+{
+  "status": "complete",
+  "utxos": [
+    {
+      "txid": "a1b2c3...",
+      "output_index": 0,
+      "value": 100000,
+      "output_pubkey": "03def456...", #script pub key
+      "height": 850000,
+      "hash": "00000000000000000002a7c4c1e48d76c5a37902165a270156b7a8d72728a054",
+      "spent": false
+    }
+  ]
+}
+```
+Response (busy):
+```json
+{
+  "status": "busy",
+  "message": "try bulk scan"
+}
+```
+
+##### POST /scan-bulk/:keys/:block_range
+
+Request:
+```json
+{
+  "scan_pk": "02abc123...",  
+  "scan_sk": "02abc123...",
+  "spend_pk": "03def456...",
+  "start_height": 800000,
+  "end_height": 800102,
+}
+```
+Response:
+```json
+{
+  "duration": 100000,
+  "token": "02abc123..."
+}
+```
+
+##### POST /scan-results/:token
+
+Request:
+```json
+{
+  "token": "02abc123..."
+}
+```
+Response (complete):
+```json
+{
+  "status": "complete",
+  "utxos": [
+    {
+      "txid": "a1b2c3...",
+      "output_index": 0,
+      "value": 100000,
+      "output_pubkey": "03def456...", #script pub key
+      "height": 850000,
+      "hash": "00000000000000000002a7c4c1e48d76c5a37902165a270156b7a8d72728a054",
+      "spent": false
+    },
+    {
+      "txid": "a1b2c3...",
+      "output_index": 3,
+      "value": 100000,
+      "output_pubkey": "03def456...", #script pub key
+      "height": 850001,
+      "hash": "00000000000000000002a7c4c1e48d76c5a37902165a270156b7a8d72728a054",
+      "spent": false
+    }
+  ]
+}
+```
+Response (busy):
+```json
+{
+  "status": "busy",
+  "duration": 10000,
+  "token": "02abc123..."
+}
+```
+
+##### STREAM /scan-mempool/:keys
+Request:
+```json
+{
+  "scan_pk": "02abc123...",  
+  "scan_sk": "02abc123...",
+  "spend_pk": "03def456..."
+}
+```
+Response (on update):
+```json
+{
+  "status": "active",
+  "last_check": <timestamp>,
+  "next_check": <timestamp>,
+  "utxos": [
+    {
+      "txid": "a1b2c3...",
+      "output_index": 0,
+      "value": 100000,
+      "output_pubkey": "03def456...", #script pub key
+      "height": 850000,
+      "hash": "00000000000000000002a7c4c1e48d76c5a37902165a270156b7a8d72728a054",
+      "spent": false
+    }
+  ]
+}
+```
+Response (failure):
+```json
+{
+  "status": "error",
+  "last_check": <timestamp>,
+  "message": "error string"
 }
 ```
 
@@ -336,6 +499,23 @@ Response:
     - Else: continue with 5.
 5. Fetch block, verify owned UTXOs and add to wallet
     - Go to 1. with height + 1
+```
+
+##### Remote Scanner Integration
+
+```
+1. Wallet requests a block or range of blocks - provide sp address and scan private key `/scan/:keys/:range`
+    1.1. Service will respond with 1 of the following:
+        - utxos found for each block
+        - "busy - requests too large" - upon receiving this response wallet can try another service or request bulk scan
+    1.2. Bulk scan - wallet provide sp address and scan private key `/scan-bulk/:keys/:range`
+        - Service responds with estimated scan duration and bulk scan token
+        - Wallet records token and sets timer for duration 
+            - on timeout wallet checks `/scan-result/:token`
+2. Wallet subscribes to unconfirmed scanning `/scan-mempool/:keys`
+    2.1. Service will scan for utxos every # seconds
+        - For each UTXO found matching a key stream message to wallet
+3. Maintain local UTXO state for spending
 ```
 
 ##### My Scanner Integration
