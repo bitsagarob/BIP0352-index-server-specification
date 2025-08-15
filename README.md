@@ -8,7 +8,7 @@ This specification defines a unified standard for Silent Payments indexing servi
 
 The goal of this specification is to provide a unified standard for Silent Payments wallet and service developers to implement receive support. The Electrum protocol provides a great model for how wallet-server communication works today, demonstrating efficient client-server interactions for lightweight Bitcoin wallets. This specification is not meant to replace the Electrum protocol but to extend it to support Silent Payments, leveraging its proven architecture to enhance privacy and efficiency.
 
-Although it might appear that index servers are only necessary for [light client support](https://github.com/setavenger/BIP0352-light-client-specification), reducing scanning operations for wallets improves the user experience, speeds up, and simplifies wallet receiving implementations. Minimizing the time it takes for users to confirm on-chain balance when opening a wallet aligns with existing expectations for user experience. Another benefit of having a common specification for tweak services is that developers can iterate on wallet or server improvements once, without requiring extensive coordination for upgrade compatibility.
+Although it might appear that index servers are only necessary for [light client support](https://github.com/setavenger/BIP0352-light-client-specification), reducing scanning operations for wallets improves the user experience, speeds up, and simplifies wallet receiving implementations. Minimizing the time it takes for users to confirm on-chain balance when opening a wallet aligns with existing expectations for user experience. Another benefit of having a common specification for tweak services is that developers can iterate on wallet or server improvements once, without requiring extensive coordination for upgrade compatibility. Additionally users and wallet developers will have the choice to migrate to the best service provider without requiring architectural changes.
 
 ## Current Landscape
 
@@ -24,11 +24,11 @@ Although it might appear that index servers are only necessary for [light client
 
 ### Self hosted
 
-A user can setup a bitcoin node and add indexing service to same infrastructure, wallet registers scan private key and silent payment address + birthdate with service for most efficient initialization and UTXO management.
+A user can setup a bitcoin node and add an indexing service to same infrastructure, wallet registers scan private key and silent payment address + birthdate with service for most efficient initialization and UTXO management.
 
 ### Hosted Services
 
-Some users may choose to forgo setting up bitcoin node infrastructure and choose to outsource tweaks for a range of blocks.  Hosted services providing Block Processor and Block Filter Manager roles can be used anonymously if care is taken by the wallet developer.
+Some users may choose to forgo setting up bitcoin node infrastructure and choose to outsource tweaks for a range of blocks. Hosted services providing Block Processor and Block Filter Manager roles can be used anonymously if care is taken by the wallet developer.
 
 ## Service Roles
 
@@ -54,9 +54,9 @@ There are three distinct service roles (steps) required to find silent payments.
 ##### SP Scanner
 
 - *requires access to full node or BP or BFM*
-- Wallet registers: scan_sk, scan_pk, spend_pk with service
+- Wallet shares: scan_sk, scan_pk, spend_pk with service
+  - Permenant (Hosted) or Ephemeral (Session)
 - Find owned UTXOs since last scan or for a range of blocks
-- Retains reference to owned UTXOS for a wallet - spent state
 - Examples
   - [sp-client::SpScanner](https://github.com/cygnet3/sp-client/blob/master/src/scanner/scanner.rs), [sp-poc](https://github.com/nymius/sp-poc/tree/feat/use_bdk_sp) (Kyoto + bdk-sp)
 
@@ -68,13 +68,12 @@ There are three distinct service roles (steps) required to find silent payments.
 | --------------------------------------------| ------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----------------------------- |
 | **Feature**                                 | **Block Processor**                                                                   | **Block Filter Manager**                                 | **SP Scanner**                |
 | *Privacy*                                   | Yes                                                                                   | Yes                                                      | No                            |
-| *Skill (User)*                              | N/A                                                                                   | N/A                                                      | N/A                           |
 | *Security (Trust)*                          | N/A                                                                                   | N/A                                                      | Yes                           |
 | *Dust*                                      | Possible                                                                              | Possible                                                 | Possible                      |
 | *Spent Tx Filtering*                        | Possible                                                                              | Possible                                                 | Possible                      |
 | *Payment Notifications*                     | No                                                                                    | Maybe                                                    | Yes                           |
 | *Mempool Monitoring*                        | No                                                                                    | Maybe                                                    | Yes                           |
-| *Performance / UX (Offline catch up delay)* | Slow - sync required                                                                  | Depends on wallet implementation                         | Typical UX                    |
+| *Performance / UX (Offline catch up delay)* | Slow - sync required                                                                  | Depends on wallet implementation                         | Depends on wallet implementation |
 | *Server Storage Requirements*               | Large                                                                                 | Small                                                    | Small                         |
 | *Client Bandwidth  (wallet <-> service)*    | Large/Moderate                                                                        | Large/Moderate                                           | Small                         |
 | *Client Transaction Rate*                   | < 2 per day                                                                           | < 2 per day                                              | unlimited                     |
@@ -103,24 +102,6 @@ Stack implementations combine one or more service roles to create unique offerin
    2. Mempool Monitoring
    3. Receive Notifications
 
-### Trusted Scanner (Personalized)
-
-- combines ***SP Scanner + Block Filter Manager + Block Processor***
-
-1. Configured to respond to any wallet
-   1. Must index entire chain from Taproot activation
-   2. Wallet request UTXOs from service
-2. Service is trusted
-   1. To preserve forward privacy a user should rotate wallet when leaving service
-3. Novice or Technical User
-   1. Register scan key pair + spend public key with server
-   2. Simple to understand workflow to configure and use (set it and forget)
-4. Additional Services
-   1. Wallet Recovery
-      1. Fast - based on filtered UTXO set
-   2. Mempool Monitoring
-   3. Receive Notifications
-
 ### Remote Scanner (Ephemeral)
 
 - combines ***SP Scanner + Block Filter Manager + Block Processor***
@@ -138,6 +119,9 @@ Stack implementations combine one or more service roles to create unique offerin
       1. Wallet should maintain SP transaction archive
    2. Mempool Monitoring
       1. May be rate limited to a few checks per minute or max per day
+   3. Labels
+      1. Each additional label requires more compute to scan / transaction
+      2. May be rate limited or require additional fee
 
 ### Serve Tweaks for any number of users (Anonymous)
 
@@ -161,50 +145,50 @@ Stack implementations combine one or more service roles to create unique offerin
 
 |                                             |                                                                    | Silent Payment Stack                                                                         |                                                                                                          |
 | ------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| **Feature**                                 | **My Scanner (Personalized)**                                      | **Remote Scanner (Ephemeral)**                                                           | **Tweak Server (Anonymous)**                                                                             |
+| **Feature**                                 | **My Scanner (Personalized)**                                      | **Remote Scanner (Ephemeral)**                                                               | **Tweak Server (Anonymous)**                                                                             |
 | *Privacy*                                   | Full <br>(register spend public key & scan private key) <br>Self Hosted  | Privacy from all but Indexer Service <br>(share spend public key & scan private key) for a session<br>Hosted | Mask interest in ScriptPubKeys and Transaction <br>(Care should be taken when filtering for blocks) <br>Hosted |
-| *Skill (User)*                              | Experienced / Technical                                            | Novice                                                                                       | Novice / Moderate                                                                                        |
-| *Security (Trust)*                          | Trusted (Self hosted)                                              | Trusted (Paid/Free)                                                                          | Untrusted (Free) <br>Should download full block on filtered match (no simplified utxo)                      |
-| *Wallet Requirements*                       | Send / Spend SP <br>[Fetch Payments](#my-scanner-integration) <br>Manage UTXOs | Send / Spend SP <br>[Fetch Payments](#remote-scanner-integration) <br>Manage UTXOs          | Send / Spend SP <br>[Scan For ScriptPubKeys](#tweak-server-integration) <br>Manage UTXOs                |
-| *Wallet Backup / Recovery*                  | Label backup is necessary, recovering transactions should be quick | Label backup is necessary, loss of history if cut through is enabled                         | Most important <br>Label backup + utxo backup would be best <br>(restore could be rate limited)                |
+| *Skill (User)*                              | Experienced / Technical                                            | Novice / Moderate                                                                            | Novice / Moderate                                                                                        |
+| *Security (Trust)*                          | Trusted (Self hosted)                                              | Trusted (Paid/Free)                                                                          | Untrusted (Free) <br>Should download full block on filtered match (no simplified utxo)                   |
+| *Wallet Requirements*                       | Send / Spend SP <br>[Fetch Payments](#my-scanner-integration) <br>Manage UTXOs | Send / Spend SP <br>[Remote Scan](#remote-scanner-integration) <br>Manage UTXOs          | Send / Spend SP <br>[Scan For ScriptPubKeys](#tweak-server-integration) <br>Manage UTXOs                |
+| *Wallet Backup / Recovery*                  | Label backup is necessary, recovering transactions should be quick | Most important <br>Label backup + utxo backup would be best <br>(restore could be rate limited) | Most important <br>Label backup + utxo backup would be best <br>(restore could be rate limited)          |
 | *Dust*                                      | wallet preference                                                  | wallet preference                                                                            | wallet preference                                                                                        |
-| *Spent Tx Filtering* (Cut Through)          | Optional                                                           | Optional                                                                                     | Possible / Necessary                                                                                     |
+| *Spent Tx Filtering* (Cut Through)          | wallet preference                                                  | wallet preference                                                                            | Possible                                                                                                 |
 | *Payment Notifications*                     | Optional                                                           | Optional                                                                                     | Not Feasible                                                                                             |
 | *Mempool Monitoring*                        | Optional                                                           | Optional                                                                                     | Not Feasible                                                                                             |
-| *Performance / UX (Offline catch up delay)* | Wallet can have same UX as traditional payment                     | Wallet will need to sync (catch up) to find all UTXOs - /scan or /scan-bulk                  | Wallet will need to sync (catch up) to find all UTXOs                                                    |
-| *Server Storage Requirements*               | Large                                                              | Large                                                                                        | Large                                                                                                    |
-| *Client Bandwidth  (wallet <-> service)*    | High                                                               | Low                                                                                          | Moderate                                                                                                 |
-| *Client Transaction Rate*                   | unlimited                                                          | < ~20 day                                                                                     | < 1 day                                                                                                  |
+| *Performance / UX (Offline catch up delay)* | Wallet can have same UX as traditional payment                     | Wallet will need to sync (catch up) to find all UTXOs - distributed scan.                    | Wallet will need to sync (catch up) to find all UTXOs                                                    |
+| *Server Storage Requirements*               | Medium                                                             | Large                                                                                        | Large                                                                                                    |
+| *Client Bandwidth  (wallet <-> service)*    | Low                                                                | Low                                                                                          | Moderate                                                                                                 |
+| *Client Transaction Rate*                   | unlimited                                                          | < ~20 day                                                                                    | < 1 day                                                                                                  |
 | *Labels*                                    | Supported - register labels with service                           | Managed by wallet                                                                            | Should labels be offered in wallet at all?                                                               |
 
 ## Server API endpoints
 
 API endpoints are grouped by Service Roles, thought has been given to include what each implementation should support "Required" vs "Optional".
 
-|                                   |                | Service Roles            | | | | | | | |
-| --------------------------------- | :------------: | :----------------------: | :-----------------: | -------------------------------------------------------------------------------------------------------- | :-----------------: | :---------------: | :------------: | :--------------------: | :--------------: |
-| **Endpoint**                      | **SP Scanner** | **Block Filter Manager** | **Block Processor** | ***Description***                                                                                        | **blindbit-oracle** | **blindbit-scan** | **silentiumd** | **silent-pay-indexer** | **cake esplora** |
-| /info                             |                |      Required       |      Required         | returns basic information about the indexing server instance                                                |          Y          |        Similar    |     Similar    |              Y         |                  |
-| /block-hash/:blockheight          |                |      Required       |      Required         | returns the block-hash for a certain block-height - used by wallet to detect reorg                          |          Y          |                   |                |              Y         |                  |
-| /tweak/:blockheight?dustLimit&filterSpent|         |                     |      Required         | returns tweak data; optional parameters filterSpent + dustLimit.                                            |          Y          |          Uses     |     Similar    |                        |     Similar      |
-| /filter/utxos/:blockheight        |                |      Required       |                       | returns a BIP 158 compliant filter of script pub keys which received funds                                  |          Y          |          Uses     |                |                        |                  |
-| /utxos/:blockheight               |    Optional?   |                     |                       | UTXO data for that block (cut down to the essentials needed to spend)                                       |          Y          |          Uses     |                |                        |                  |
-| /filter/spent/:blockheight        |                |      Optional?      |                       | returns a filter for shortened spent outpoint hashes; optional validation of spent outpoints                |          Y          |          Uses     |     Similar    |              Y         |                  |
-| /spent-index/:blockheight         |    Optional?   |                     |                       | returns the spent outpoints index                                                                           |          Y          |          Uses     |                |                        |                  |
-| | | | | | | | | | |
-| rpc blockchain.tweaks.subscribe   |                |                     |          Y            |                                                                                                             |                     |                   |                |                        |         Y        |
-| rpc blockchain.scripthash.get_balance|     Y       |                     |                       |                                                                                                             |                     |                   |                |                        |         Y        |
-| rpc blockchain.scripthash.get_history|     Y       |                     |                       |                                                                                                             |                     |                   |                |                        |         Y        |
-| | | | | | | | | | |
-| /register                         |        Y       |                     |                       | handles registering new wallets; returns unique wallet identifier                                           |                     |        Y          |                |                        |                  |
-| /wallet/utxos?restore             |        Y       |                     |                       | serves UTXOs since last check; restore all known UTXOs                                                      |                     |        Y          |                |                        |                  |
-| /labels                           |        Y       |                     |                       | add or return list of labels                                                                                |                     |        Y          |                |                        |                  |
-| | | | | | | | | | |
-| /scan/:keys/:block_range          | | | | scan a range of blocks given scan_sk + sp address; returns UTXOs or busy | | | | |
-| /scan-bulk/:keys/:block_range     | | | | start async scan for UTXOs; returns a scan token and expected duration | | | | |
-| /scan-results/:token              | | | | provide scan token to collect UTXOs or updated duration | | | | |
-| /scan-mempool/:keys               | | | | subscribe to unconfirmed scanning given scan_sk + sp address | | | | |
-
+|                                   |                | Service Roles            | | | | | | |
+| --------------------------------- | :------------: | :----------------------: | :-----------------: | -------------------------------------------------------------------------------------------------------- | :-----------------: | :---------------: | :------------: | :--------------: |
+| **Endpoint**                      | **SP Scanner** | **Block Filter Manager** | **Block Processor** | ***Description***                                                                                        | **blindbit-oracle** | **blindbit-scan** | **silentiumd** | **cake esplora** |
+| /info                             |                |      Required       |      Required         | returns basic information about the indexing server instance                                                |          Y          |        Similar    |     Similar    |                  |
+| /block-hash/:blockheight          |                |      Required       |      Required         | returns the block-hash for a certain block-height - used by wallet to detect reorg                          |          Y          |                   |                |                  |
+| /tweaks/:blockheight?dustLimit&filterSpent|         |                     |      Required         | returns tweak data; optional parameters filterSpent + dustLimit.                                            |          Y          |          Uses     |     Similar    |     Similar      |
+| /filter/utxos/:blockheight        |                |      Required       |                       | returns a BIP 158 compliant filter of script pub keys which received funds                                  |          Y          |          Uses     |                |                  |
+| /utxos/:blockheight               |    Optional?   |                     |                       | UTXO data for that block (cut down to the essentials needed to spend)                                       |          Y          |          Uses     |                |                  |
+| /filter/spent/:blockheight        |                |      Optional?      |                       | returns a filter for shortened spent outpoint hashes; optional validation of spent outpoints                |          Y          |          Uses     |     Similar    |                  |
+| /spent-index/:blockheight         |    Optional?   |                     |                       | returns the spent outpoints index                                                                           |          Y          |          Uses     |                |                  |
+| **Proposed** | | | | | | | | |
+| /scan/:keys/:block_range/[:labels]  |        Y       | | | scan a range of blocks given scan_sk + sp address; returns UTXOs or busy | | | |
+| /scan-bulk/:keys/:block_range/[:labels]|        Y       | | | start async scan for UTXOs; returns a scan token and expected duration   | | | |
+| /scan-check/:token                  |        Y       | | | provide scan token to collect UTXOs or updated duration                  | | | |
+| /scan-cancel/:token                 |        Y       | | | provide scan token to cancel bulk scan; wallet courtesy                  | | | |
+| /scan-mempool/:keys/[:labels]       |        Y       | | | subscribe to unconfirmed scanning given scan_sk + sp address             | | | |
+| **Electrum** | | | | | | | | |
+| rpc blockchain.tweaks.subscribe   |                |                     |          Y            |                                                                                                             |                     |                   |                |         Y        |
+| rpc blockchain.scripthash.get_balance|     Y       |                     |                       |                                                                                                             |                     |                   |                |         Y        |
+| rpc blockchain.scripthash.get_history|     Y       |                     |                       |                                                                                                             |                     |                   |                |         Y        |
+| **?** | | | | | | | | |
+| /register                         |    Optional?   |                     |                       | handles registering new wallets; returns unique wallet identifier                                           |                     |        Y          |                |                  |
+| /wallet/utxos?restore             |    Optional?   |                     |                       | serves UTXOs since last check; restore all known UTXOs                                                      |                     |        Y          |                |                  |
+| /labels                           |    Optional?   |                     |                       | add or return list of labels                                                                                |                     |        Y          |                |                  |
 
 ### API Request/Response Schemas
 
@@ -248,7 +232,6 @@ API endpoints are grouped by Service Roles, thought has been given to include wh
   "tweaks": [
      "02abc123...",
      "03def456...",
-    }
   ],
   "checksum or count": 1234,
 }
@@ -279,7 +262,7 @@ API endpoints are grouped by Service Roles, thought has been given to include wh
 
 #### Ephemeral Scanner Service Endpoints
 
-##### POST /scan/:keys/:block_range
+##### POST /scan/:keys/:block_range/[:labels]
 
 Request:
 ```json
@@ -289,6 +272,7 @@ Request:
   "spend_pk": "03def456...",
   "start_height": 800000,
   "end_height": 800002,
+  "labels_index" : [1, 2, 3] # optional label index
 }
 ```
 Response (complete):
@@ -316,7 +300,7 @@ Response (busy):
 }
 ```
 
-##### POST /scan-bulk/:keys/:block_range
+##### POST /scan-bulk/:keys/:block_range/[:labels]
 
 Request:
 ```json
@@ -326,6 +310,7 @@ Request:
   "spend_pk": "03def456...",
   "start_height": 800000,
   "end_height": 800102,
+  "labels_index" : [1, 3, 7] # optional label index
 }
 ```
 Response:
@@ -336,7 +321,7 @@ Response:
 }
 ```
 
-##### POST /scan-results/:token
+##### POST /scan-check/:token
 
 Request:
 ```json
@@ -379,13 +364,29 @@ Response (busy):
 }
 ```
 
-##### STREAM /scan-mempool/:keys
+##### POST /scan-cancel/:token
+
 Request:
 ```json
 {
-  "scan_pk": "02abc123...",  
+  "token": "02abc123..."
+}
+```
+Response:
+```json
+{
+  "status": "complete"
+}
+```
+
+##### STREAM /scan-mempool/:keys/[:labels]
+Request:
+```json
+{
+  "scan_pk": "02abc123...",
   "scan_sk": "02abc123...",
-  "spend_pk": "03def456..."
+  "spend_pk": "03def456...",
+  "labels_index" : [2, 3] # optional label index
 }
 ```
 Response (on update):
@@ -459,12 +460,6 @@ Response:
 }
 ```
 
-##### GET|POST /labels
-
-```json
-#TODO
-```
-
 #### Error Response Format
 
 ```json
@@ -511,11 +506,11 @@ Response:
     1.2. Bulk scan - wallet provide sp address and scan private key `/scan-bulk/:keys/:range`
         - Service responds with estimated scan duration and bulk scan token
         - Wallet records token and sets timer for duration 
-            - on timeout wallet checks `/scan-result/:token`
+            - on timeout wallet checks `/scan-check/:token`
 2. Wallet subscribes to unconfirmed scanning `/scan-mempool/:keys`
     2.1. Service will scan for utxos every # seconds
-        - For each UTXO found matching a key stream message to wallet
-3. Maintain local UTXO state for spending
+        - For each UTXO found matching a key; stream message to wallet
+3. Wallet maintain local UTXO state for spending
 ```
 
 ##### My Scanner Integration
@@ -529,7 +524,7 @@ Response:
 
 ## Testing
 
-Reference implementations or specific test vectors for section 2 and 3. Section 1 is fully defined in actual BIP352 Spec
+Reference implementations or specific test vectors for section 2 and 3. Section 1 is fully defined in BIP352 Spec
 
 1. Verify Tweak Derivation - [BIP352 Test Vectors](https://github.com/bitcoin/bips/blob/master/bip-0352/send_and_receive_test_vectors.json)
 2. Block Processing
@@ -539,27 +534,11 @@ Reference implementations or specific test vectors for section 2 and 3. Section 
       1. Spent Tx Filtering (cut-through)
       2. Dust
 
-### Reference Test Vectors #TODO
+### Reference Test Vectors
 
 #### Block Processing Test Vector
 
-```json
-{
-  "height": 834000,
-  "expected_tweaks": 12,
-  "dust_limit": 546,
-  "expected_filtered_tweaks": 8,
-  "test_cases": [ #TODO: need to define multiple inputs and expected outputs
-    { 
-      "txid": "abc123...",
-      "output_index": 0,
-      "prev_outs" : [],
-      "output_value": 100000,
-      "expected_tweak": "02def456..."
-    }
-  ]
-}
-```
+- [Embedded Service Comparison [Block Test Vectors]](https://github.com/silent-payments/tweak-service-auditor/issues/1)
 
 #### Interoperability Tests
 
@@ -577,17 +556,18 @@ Reference implementations or specific test vectors for section 2 and 3. Section 
 - Rate limiting applied per IP address
 - No user registration or key storage
 
-###### Authenticated Services (Scanner Services)
+###### Scanner Services
 
-- API key or wallet ID based authentication
-- Secure key storage for registered keys
+- Token or wallet ID based authentication
+- Key storage should be ephemeral for the life of a session
+  - Use token for fetching scan results
 
 ### Security Considerations
 
 ##### Rate Limiting Standards
 
 - Anonymous services: Maximum 10 blocks / minute
-- Authenticated services: Unlimited for registered users
+- Scanner services: Depends on load and service offering
 
 ##### Privacy Protection
 
@@ -599,3 +579,8 @@ Reference implementations or specific test vectors for section 2 and 3. Section 
 - Block hash verification required for reorg detection
 - Tweak data should be verifiable against full node data
 - Checksums recommended for bulk data transfers (How does a wallet know all tweaks were received for a given block request?)
+
+
+### Other Considerations
+
+- Pagination for large bulk results
