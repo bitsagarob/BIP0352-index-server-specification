@@ -1,0 +1,54 @@
+sequenceDiagram
+    participant Wallet
+    participant Scanner as Remote Scanner
+    participant BFM as Block Filter Manager
+    participant BP as Block Processor
+    participant BC as Bitcoin Node
+
+    %% Block Processor syncs with Bitcoin Core Node asynchronously
+    BC-->>BP: New Block
+    Note right of BP: compute tweak 
+    Note right of BP: index unspent outputs
+    BP-->>BP: compute tweak
+    
+    %% Block Filter Manager
+    BP-->>+BFM: new block
+    BFM-->>BFM: build taproot GCS filter
+    
+    %% 1.1 Regular block/range scanning
+    Wallet->>+Scanner: (1) scan for UTXOs /scan/:keys/:block(s)
+    alt Request too large
+        Scanner->>Wallet: service busy - "try bulk scan"
+    else scan UTXOs "complete"
+        Scanner->>+BP: Request tweaks & TXOs for block(s)
+        BP-->>-Scanner: Tweaks & relevant TXOs
+        Scanner-->>Scanner: compute_spouts(tweaks, scan_sk, spend_pk)
+        Scanner->>+BFM: Request filters
+        BFM-->>-Scanner: utxo and outpoint filters
+        Scanner-->>Scanner: calculate UTXOs - check_spouts(spouts, filter)
+    end
+
+    %% 1.2 Bulk scan workflow
+    Wallet->>+Scanner: (2) bulk scan for UTXOs /scan-bulk/:keys/:block(s)
+    Scanner->>-Wallet: estimated duration + bulk scan token
+    Wallet-->>Wallet: Wallet save token, set scan check timer
+    
+    loop bulk scan check - after duration
+        Wallet->>+Scanner: /scan-check/:token
+        Scanner-->>-Wallet: Scan results or status
+    end
+    Note over Wallet: Wallet maintains local UTXO state for spending
+
+    %% 2. Mempool scanning subscription
+    Wallet->>+Scanner: (3) scan mempool /scan-mempool/:keys
+    
+    loop timer loop every x seconds
+        Scanner->>+BC: Check mempool for new transactions
+        BC->>-Scanner: New mempool transactions
+        Scanner-->>Scanner: Scan for matching UTXOs (all keys)
+        Scanner-->>-Wallet: notify unconfirmed UTXOs
+    end
+    
+
+    
+    

@@ -474,15 +474,9 @@ Response:
 
 ## Diagrams
 
-[Services Communication](https://github.com/macgyver13/silent-payments-hub/blob/main/diagrams/tweak_service_sequence.mmd)
-
-[Danawallet-Blindbit Communication](https://github.com/macgyver13/silent-payments-hub/blob/main/diagrams/dana-blindbit.mmd)
-
-*(embed diagram here in final spec)*
-
 ### Wallet Integration Patterns
 
-##### Tweak Server Integration
+##### [Tweak Server Integration](https://github.com/silent-payments/BIP0352-index-server-specification/blob/main/diagrams/dana-blindbit.mmd)
 
 ```
 (per block)
@@ -496,7 +490,7 @@ Response:
     - Go to 1. with height + 1
 ```
 
-##### Remote Scanner Integration
+##### [Remote Scanner Integration](https://github.com/silent-payments/BIP0352-index-server-specification/blob/main/diagrams/remote_scanner_sequence.mmd)
 
 ```
 1. Wallet requests a block or range of blocks - provide sp address and scan private key `/scan/:keys/:range`
@@ -513,7 +507,7 @@ Response:
 3. Wallet maintain local UTXO state for spending
 ```
 
-##### My Scanner Integration
+##### [My Scanner Integration](https://github.com/silent-payments/BIP0352-index-server-specification/blob/main/diagrams/my_scanner_sequence.mmd)
 
 ```
 1. Register wallet sp address and scan private key with /register endpoint
