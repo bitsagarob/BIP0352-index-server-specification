@@ -144,10 +144,11 @@ API endpoints are grouped by Service Roles, thought has been given to include wh
 
 
 [1] blindbit-oracle v2: JSON routes answer but are deprecated in favor of gRPC,
-response shapes changed from v1, and dustLimit / filterSpent are currently
-reserved rather than applied. v1's filter endpoints were removed; spent outputs
-are unsalted 8-byte x-only pubkey prefixes. Verified against a production v2
-deployment, 2026-09-02.
+and response shapes changed from v1. The dustLimit / filterSpent query
+parameters above are ignored by the v2 REST handlers, and the gRPC request's
+dustlimit / cut_through fields are documented upstream as reserved, not yet
+applied. v1's filter endpoints were removed; spent outputs are unsalted 8-byte
+x-only pubkey prefixes. Verified against a production v2 deployment, 2026-09-02.
 
 ### API Request/Response Schemas
 
